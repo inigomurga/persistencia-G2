@@ -20,6 +20,7 @@ bucket = "windDB"
 
 # Leer y enviar datos desde un archivo CSV
 def insertar_datos(dataset_path, write_api):
+    datos = []
     with open(dataset_path, mode='r+', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
         for i, row in enumerate(reader):
@@ -28,23 +29,23 @@ def insertar_datos(dataset_path, write_api):
                 fecha_original = datetime.strptime(row["Date/Time"], "%d %m %Y %H:%M")
                 fecha_modificada = fecha_original.replace(year=fecha_original.year + 7).replace(tzinfo=timezone.utc)
                 
-                point = Point("wind_data") \
+                dato = Point("wind_data") \
                     .time(fecha_modificada) \
                     .field("LV ActivePower (kW)", float(row["LV ActivePower (kW)"])) \
                     .field("Wind Speed (m/s)", float(row["Wind Speed (m/s)"])) \
                     .field("Theoretical_Power_Curve (KWh)", float(row["Theoretical_Power_Curve (KWh)"])) \
                     .field("Wind Direction", float(row["Wind Direction"]))
-
-                write_api.write(bucket=bucket, org=org, record=point)
-                logging.info(f"La fila {i} del csv ha sido insertada.")
-                time.sleep(1)  
-                                 
+               
+                datos.append(dato) 
+                                                  
             except Exception as e:
                 print(f"Error al escribir datos: {e}")
                 logging.error(f"Error al escribir datos: {e}")
-                
-    print("Datos insertados correctamente.")
-    logging.info("Datos insertados correctamente.")
+     # Escribir todos los puntos de una vez
+    if datos:
+        write_api.write(bucket=bucket, org=org, record=datos)
+        print(f"{len(datos)} filas de datos insertadas correctamente.")
+        logging.info(f"{len(datos)} filas de datos insertadas correctamente.")
 
 def ejecutar_consultas(client):
     query_api = client.query_api()
