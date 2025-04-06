@@ -1,24 +1,34 @@
-from influxdb_client import InfluxDBClient, Point, WriteOptions
+from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 import csv
 from datetime import datetime, timezone
+import time
+import logging
+import os
+
+# Configurar logs
+LOG_DIR = "logs"
+LOG_FILE = os.path.join(LOG_DIR, "logs.log")
+os.makedirs(LOG_DIR, exist_ok=True)
+logging.basicConfig(filename=LOG_FILE, level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Configuración de InfluxDB
 url = "http://localhost:8086"
-token = "0Tz-yZkl1yCgl_vV5gnhClcK18FfCL3-Dk0vhs3v-SPsqJv0tDq3Fgv4kn3TQAZPi2dzzrLWO4tioNeM_YQfbQ==-b-qmSESClzj4rniXL9Ig=="
+token = "bdBIR2X2c3Bmi6O3fkzPF0Kw18lKWrsPXLbOLbb_5jKBLXXAJOiDa7jzFGYWFoe9V-b-qmSESClzj4rniXL9Ig=="
 org = "deusto"
 bucket = "windDB"
 
 # Leer y enviar datos desde un archivo CSV
 def insertar_datos(dataset_path, write_api):
-    with open(dataset_path, mode='r') as file:
+    i = 0
+    with open(dataset_path, mode='r+', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
         for row in reader:
             try:
                 # Parsear fecha y sumar 7 años
                 fecha_original = datetime.strptime(row["Date/Time"], "%d %m %Y %H:%M")
                 fecha_modificada = fecha_original.replace(year=fecha_original.year + 7).replace(tzinfo=timezone.utc)
-
+                
                 point = Point("wind_data") \
                     .time(fecha_modificada) \
                     .field("LV ActivePower (kW)", float(row["LV ActivePower (kW)"])) \
@@ -27,11 +37,13 @@ def insertar_datos(dataset_path, write_api):
                     .field("Wind Direction", float(row["Wind Direction"]))
 
                 write_api.write(bucket=bucket, org=org, record=point)
+                logging.info(f"La fila {i} del csv ha sido insertada.")
+                time.sleep(1)
+                i += 1                    
             except Exception as e:
                 print(f"Error al escribir datos: {e}")
     print("Datos insertados correctamente.")
 
-# Consultas agregadas usando Flux
 def ejecutar_consultas(client):
     query_api = client.query_api()
 
@@ -69,7 +81,7 @@ def ejecutar_consultas(client):
             for record in table.records:
                 print(f"{record.get_time()} | {record.get_field()} | {record.get_value()}")
 
-# Gestión del cliente y escritura + consultas
+# Gestión del cliente y escritura
 with InfluxDBClient(url=url, token=token, org=org) as client:
     write_api = client.write_api(write_options=SYNCHRONOUS)
     insertar_datos("T1.csv", write_api)
